@@ -1,0 +1,11 @@
+# netlify.toml
+[build]
+  publish = "." # This tells Netlify to serve files from the root of your repo (where index.html is)
+  functions = "netlify/functions" # This tells Netlify where to find your serverless functions
+
+# Optional: If you want to use Netlify Dev for local testing
+[dev]
+  framework = "#static" # Treat the project as a static site
+  functions = "netlify/functions"
+  publish = "."
+  port = 8888 # Default port for Netlify Dev
