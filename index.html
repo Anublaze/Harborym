@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OSINT Reconnaissance Tool</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c; /* Dark background */
+            color: #e2e8f0; /* Light text */
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Align to top for better content flow */
+            min-height: 100vh;
+            padding: 2rem;
+            box-sizing: border-box;
+        }
+        .container {
+            max-width: 900px;
+            width: 100%;
+            background-color: #2d3748; /* Slightly lighter dark background for container */
+            border-radius: 1rem;
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.3);
+            padding: 2rem;
+            margin-top: 2rem; /* Add some margin from the top */
+        }
+        .section-title {
+            color: #4299e1; /* Blue color for titles */
+            font-weight: 700;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid #4299e1;
+            padding-bottom: 0.5rem;
+        }
+        .info-card {
+            background-color: #242c38; /* Even darker for info cards */
+            border-radius: 0.75rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            word-wrap: break-word; /* Ensure long text wraps */
+        }
+        .info-card p {
+            margin-bottom: 0.5rem;
+        }
+        .info-card strong {
+            color: #a0aec0; /* Lighter grey for labels */
+        }
+        .llm-response {
+            background-color: #1f2937; /* Darker background for LLM response */
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-top: 1rem;
+            border: 1px solid #4a5568;
+        }
+    </style>
+</head>
+<body class="antialiased">
+    <div class="container">
+        <h1 class="text-4xl font-extrabold text-center mb-8 text-blue-400">OSINT Reconnaissance Tool</h1>
+
+        <div class="mb-6">
+            <label for="domainInput" class="block text-gray-300 text-lg font-bold mb-2">Enter Domain Name:</label>
+            <div class="flex flex-col sm:flex-row gap-4">
+                <input type="text" id="domainInput" placeholder="e.g., example.com"
+                       class="flex-grow p-3 rounded-lg bg-gray-700 border border-gray-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button id="lookupButton"
+                        class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-lg
+                               transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    Perform Lookup
+                </button>
+            </div>
+            <p id="errorMessage" class="text-red-400 mt-2 hidden"></p>
+        </div>
+
+        <div id="loadingIndicator" class="text-center text-blue-400 text-lg hidden mb-6">
+            <svg class="animate-spin h-8 w-8 text-blue-400 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="mt-2">Fetching data...</p>
+        </div>
+
+        <div id="resultsContainer" class="space-y-6 hidden">
+            <!-- Whois Lookup Results -->
+            <div id="whoisResults" class="bg-gray-800 p-6 rounded-xl shadow-md">
+                <h2 class="section-title">Whois Lookup</h2>
+                <div id="whoisContent" class="text-gray-300">
+                    <!-- Whois data will be inserted here -->
+                    <p class="text-center text-gray-500">No Whois data available yet. Enter a domain and click 'Perform Lookup'.</p>
+                </div>
+                <button id="summarizeWhoisButton"
+                        class="mt-4 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg shadow-lg
+                               transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-500 hidden">
+                    ✨ Summarize Whois
+                </button>
+                <div id="whoisSummaryLoading" class="text-center text-purple-400 text-sm mt-2 hidden">
+                    <svg class="animate-spin h-5 w-5 text-purple-400 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <p>Generating summary...</p>
+                </div>
+                <div id="whoisSummaryContent" class="llm-response hidden"></div>
+            </div>
+
+            <!-- DNS Lookup Results -->
+            <div id="dnsResults" class="bg-gray-800 p-6 rounded-xl shadow-md">
+                <h2 class="section-title">DNS Lookup</h2>
+                <div id="dnsContent" class="text-gray-300">
+                    <!-- DNS data will be inserted here -->
+                    <p class="text-center text-gray-500">No DNS data available yet. Enter a domain and click 'Perform Lookup'.</p>
+                </div>
+            </div>
+
+            <!-- Web Archives Results -->
+            <div id="webArchivesResults" class="bg-gray-800 p-6 rounded-xl shadow-md">
+                <h2 class="section-title">Web Archives</h2>
+                <div id="webArchivesContent" class="text-gray-300">
+                    <!-- Web archives data will be inserted here -->
+                    <p class="text-center text-gray-500">No Web Archives data available yet. Enter a domain and click 'Perform Lookup'.</p>
+                </div>
+            </div>
+
+            <!-- LLM Suggested Next Steps -->
+            <div id="nextStepsSection" class="bg-gray-800 p-6 rounded-xl shadow-md hidden">
+                <h2 class="section-title">Suggested Next Steps & Insights</h2>
+                <button id="suggestNextStepsButton"
+                        class="mt-4 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-lg
+                               transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500">
+                    ✨ Suggest Next Steps
+                </button>
+                <div id="nextStepsLoading" class="text-center text-green-400 text-sm mt-2 hidden">
+                    <svg class="animate-spin h-5 w-5 text-green-400 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <p>Generating suggestions...</p>
+                </div>
+                <div id="nextStepsContent" class="llm-response hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const domainInput = document.getElementById('domainInput');
+            const lookupButton = document.getElementById('lookupButton');
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            const resultsContainer = document.getElementById('resultsContainer');
+            const whoisContent = document.getElementById('whoisContent');
+            const dnsContent = document.getElementById('dnsContent');
+            const webArchivesContent = document.getElementById('webArchivesContent');
+            const errorMessage = document.getElementById('errorMessage');
+
+            // LLM related elements
+            const summarizeWhoisButton = document.getElementById('summarizeWhoisButton');
+            const whoisSummaryLoading = document.getElementById('whoisSummaryLoading');
+            const whoisSummaryContent = document.getElementById('whoisSummaryContent');
+            const nextStepsSection = document.getElementById('nextStepsSection');
+            const suggestNextStepsButton = document.getElementById('suggestNextStepsButton');
+            const nextStepsLoading = document.getElementById('nextStepsLoading');
+            const nextStepsContent = document.getElementById('nextStepsContent');
+
+            let currentWhoisData = null;
+            let currentDnsData = null;
+            let currentWebArchivesData = null;
+            let currentDomain = '';
+
+            // Define the backend URL
+            const BACKEND_URL = 'http://localhost:3000'; // Make sure this matches your server.js port
+
+            // Function to display a message in a specific content area
+            const displayMessage = (element, message, isError = false) => {
+                element.innerHTML = `<p class="${isError ? 'text-red-400' : 'text-gray-500'} text-center">${message}</p>`;
+            };
+
+            // Function to clear previous results and LLM outputs
+            const clearResults = () => {
+                displayMessage(whoisContent, 'No Whois data available yet. Enter a domain and click \'Perform Lookup\'.');
+                displayMessage(dnsContent, 'No DNS data available yet. Enter a domain and click \'Perform Lookup\'.');
+                displayMessage(webArchivesContent, 'No Web Archives data available yet. Enter a domain and click \'Perform Lookup\'.');
+                
+                whoisSummaryContent.classList.add('hidden');
+                whoisSummaryContent.innerHTML = '';
+                summarizeWhoisButton.classList.add('hidden');
+                whoisSummaryLoading.classList.add('hidden');
+
+                nextStepsContent.classList.add('hidden');
+                nextStepsContent.innerHTML = '';
+                nextStepsSection.classList.add('hidden');
+                suggestNextStepsButton.classList.remove('hidden'); // Ensure button is visible for new lookup
+                nextStepsLoading.classList.add('hidden');
+
+                resultsContainer.classList.add('hidden');
+                errorMessage.classList.add('hidden');
+
+                currentWhoisData = null;
+                currentDnsData = null;
+                currentWebArchivesData = null;
+                currentDomain = '';
+            };
+
+            // Updated fetchData function to call the backend
+            async function fetchData(domain) {
+                const results = {};
+                const fetchPromises = [];
+
+                // Fetch Whois data
+                fetchPromises.push(fetch(`${BACKEND_URL}/api/whois?domain=${domain}`)
+                    .then(response => {
+                        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                        return response.json();
+                    })
+                    .then(data => { results.whois = data; })
+                    .catch(error => {
+                        console.error('Error fetching Whois:', error);
+                        results.whois = null; // Indicate failure
+                        errorMessage.textContent = 'Failed to fetch Whois data.';
+                        errorMessage.classList.remove('hidden');
+                    })
+                );
+
+                // Fetch DNS data
+                fetchPromises.push(fetch(`${BACKEND_URL}/api/dns?domain=${domain}`)
+                    .then(response => {
+                        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                        return response.json();
+                    })
+                    .then(data => { results.dns = data; })
+                    .catch(error => {
+                        console.error('Error fetching DNS:', error);
+                        results.dns = []; // Indicate failure
+                        errorMessage.textContent = 'Failed to fetch DNS data.';
+                        errorMessage.classList.remove('hidden');
+                    })
+                );
+
+                // Fetch Web Archives data
+                fetchPromises.push(fetch(`${BACKEND_URL}/api/webarchives?domain=${domain}`)
+                    .then(response => {
+                        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                        return response.json();
+                    })
+                    .then(data => { results.webArchives = data; })
+                    .catch(error => {
+                        console.error('Error fetching Web Archives:', error);
+                        results.webArchives = []; // Indicate failure
+                        errorMessage.textContent = 'Failed to fetch Web Archives data.';
+                        errorMessage.classList.remove('hidden');
+                    })
+                );
+
+                // Wait for all fetches to complete
+                await Promise.allSettled(fetchPromises);
+                return results;
+            }
+
+            // Function to render Whois data
+            const renderWhois = (data) => {
+                if (!data) {
+                    displayMessage(whoisContent, 'No Whois data found for this domain.');
+                    summarizeWhoisButton.classList.add('hidden');
+                    return;
+                }
+                whoisContent.innerHTML = `
+                    <div class="info-card">
+                        <p><strong>Domain Name:</strong> ${data.domainName || 'N/A'}</p>
+                        <p><strong>Registrar:</strong> ${data.registrar || 'N/A'}</p>
+                        <p><strong>Registration Date:</strong> ${data.registrationDate ? new Date(data.registrationDate).toLocaleDateString() : 'N/A'}</p>
+                        <p><strong>Expiration Date:</strong> ${data.expirationDate ? new Date(data.expirationDate).toLocaleDateString() : 'N/A'}</p>
+                        <p><strong>Status:</strong> ${data.status || 'N/A'}</p>
+                        <p><strong>Name Servers:</strong> ${data.nameServers && data.nameServers.length > 0 ? data.nameServers.join(', ') : 'N/A'}</p>
+                        <p><strong>Admin Contact:</strong> ${data.adminContact || 'N/A'}</p>
+                        <p><strong>Tech Contact:</strong> ${data.techContact || 'N/A'}</p>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-400 mt-4 mb-2">Raw Whois Data:</h3>
+                    <div class="info-card bg-gray-900 p-3 text-sm overflow-auto max-h-60">
+                        <pre class="whitespace-pre-wrap">${data.raw || 'N/A'}</pre>
+                    </div>
+                `;
+                summarizeWhoisButton.classList.remove('hidden'); // Show summarize button if Whois data is present
+            };
+
+            // Function to render DNS data
+            const renderDns = (data) => {
+                if (!data || data.length === 0) {
+                    displayMessage(dnsContent, 'No DNS records found for this domain.');
+                    return;
+                }
+                dnsContent.innerHTML = `
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        ${data.map(record => `
+                            <div class="info-card">
+                                <p><strong>Type:</strong> ${record.type || 'N/A'}</p>
+                                <p><strong>Host:</strong> ${record.host || 'N/A'}</p>
+                                <p><strong>Value:</strong> ${record.value || 'N/A'}</p>
+                                ${record.priority ? `<p><strong>Priority:</strong> ${record.priority}</p>` : ''}
+                                <p><strong>TTL:</strong> ${record.ttl || 'N/A'} seconds</p>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            };
+
+            // Function to render Web Archives data
+            const renderWebArchives = (data) => {
+                if (!data || data.length === 0) {
+                    displayMessage(webArchivesContent, 'No Web Archives found for this domain.');
+                    return;
+                }
+                webArchivesContent.innerHTML = `
+                    <div class="space-y-3">
+                        ${data.map(archive => `
+                            <div class="info-card flex items-center justify-between">
+                                <p class="flex-grow"><strong>Capture:</strong> ${archive.date || 'N/A'}</p>
+                                <a href="${archive.url}" target="_blank" rel="noopener noreferrer"
+                                   class="text-blue-400 hover:text-blue-300 underline font-medium ml-4">View Archive</a>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <p class="text-sm text-gray-500 mt-4 text-center">
+                        Note: These are simulated links to the Internet Archive. Actual results would link directly to specific captures.
+                    </p>
+                `;
+            };
+
+            // Main lookup function
+            lookupButton.addEventListener('click', async () => {
+                const domain = domainInput.value.trim();
+                clearResults(); // Clear previous results on new lookup
+
+                if (!domain) {
+                    errorMessage.textContent = 'Please enter a domain name.';
+                    errorMessage.classList.remove('hidden');
+                    return;
+                }
+
+                currentDomain = domain; // Store the current domain
+
+                loadingIndicator.classList.remove('hidden');
+                errorMessage.classList.add('hidden'); // Hide error message if previously shown
+
+                try {
+                    // Call the backend to fetch all data
+                    const data = await fetchData(domain); 
+
+                    currentWhoisData = data.whois;
+                    currentDnsData = data.dns;
+                    currentWebArchivesData = data.webArchives;
+
+                    renderWhois(currentWhoisData);
+                    renderDns(currentDnsData);
+                    renderWebArchives(currentWebArchivesData);
+
+                    resultsContainer.classList.remove('hidden'); // Show results container
+                    nextStepsSection.classList.remove('hidden'); // Show the next steps section
+                } catch (error) {
+                    console.error('Error during lookup:', error);
+                    errorMessage.textContent = 'An error occurred during lookup. Please ensure the backend server is running.';
+                    errorMessage.classList.remove('hidden');
+                    // Ensure content areas show error if individual fetches failed
+                    if (!currentWhoisData) displayMessage(whoisContent, 'Failed to fetch Whois data. Please try again.', true);
+                    if (!currentDnsData || currentDnsData.length === 0) displayMessage(dnsContent, 'Failed to fetch DNS data. Please try again.', true);
+                    if (!currentWebArchivesData || currentWebArchivesData.length === 0) displayMessage(webArchivesContent, 'Failed to fetch Web Archives data. Please try again.', true);
+                } finally {
+                    loadingIndicator.classList.add('hidden');
+                }
+            });
+
+            // LLM Integration Functions
+            const callGeminiAPI = async (prompt, loadingElement, contentElement) => {
+                loadingElement.classList.remove('hidden');
+                contentElement.classList.add('hidden');
+                contentElement.innerHTML = ''; // Clear previous LLM content
+
+                try {
+                    let chatHistory = [];
+                    chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+                    const payload = { contents: chatHistory };
+                    const apiKey = ""; // If you want to use models other than gemini-2.0-flash or imagen-3.0-generate-002, provide an API key here. Otherwise, leave this as-is.
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const result = await response.json();
+
+                    if (result.candidates && result.candidates.length > 0 &&
+                        result.candidates[0].content && result.candidates[0].content.parts &&
+                        result.candidates[0].content.parts.length > 0) {
+                        const text = result.candidates[0].content.parts[0].text;
+                        contentElement.innerHTML = `<p>${text.replace(/\n/g, '<br>')}</p>`; // Display response, handle newlines
+                        contentElement.classList.remove('hidden');
+                    } else {
+                        contentElement.innerHTML = '<p class="text-red-400">Error: Could not get a valid response from the LLM.</p>';
+                        contentElement.classList.remove('hidden');
+                        console.error('LLM response structure unexpected:', result);
+                    }
+                } catch (error) {
+                    contentElement.innerHTML = `<p class="text-red-400">Error calling LLM: ${error.message}</p>`;
+                    contentElement.classList.remove('hidden');
+                    console.error('Error calling Gemini API:', error);
+                } finally {
+                    loadingElement.classList.add('hidden');
+                }
+            };
+
+            // Summarize Whois Button Click
+            summarizeWhoisButton.addEventListener('click', async () => {
+                if (currentWhoisData && currentWhoisData.raw) {
+                    const prompt = `Summarize the following WHOIS data, extracting key information like domain name, registrar, registration date, expiration date, name servers, and contact information. Present it concisely and clearly. \n\n${currentWhoisData.raw}`;
+                    await callGeminiAPI(prompt, whoisSummaryLoading, whoisSummaryContent);
+                } else {
+                    displayMessage(whoisSummaryContent, 'No raw Whois data available to summarize.', true);
+                    whoisSummaryContent.classList.remove('hidden');
+                }
+            });
+
+            // Suggest Next Steps Button Click
+            suggestNextStepsButton.addEventListener('click', async () => {
+                let prompt = `Based on the following OSINT data for the domain '${currentDomain}', suggest 3-5 logical reconnaissance steps a red team might take. Focus on actionable steps. If any anomalies or potential risks are apparent from the data, mention them. \n\n`;
+
+                if (currentWhoisData) {
+                    prompt += `WHOIS Data:\nDomain Name: ${currentWhoisData.domainName || 'N/A'}\nRegistrar: ${currentWhoisData.registrar || 'N/A'}\nRegistration Date: ${currentWhoisData.registrationDate ? new Date(currentWhoisData.registrationDate).toLocaleDateString() : 'N/A'}\nExpiration Date: ${currentWhoisData.expirationDate ? new Date(currentWhoisData.expirationDate).toLocaleDateString() : 'N/A'}\nStatus: ${currentWhoisData.status || 'N/A'}\nName Servers: ${currentWhoisData.nameServers && currentWhoisData.nameServers.length > 0 ? currentWhoisData.nameServers.join(', ') : 'N/A'}\nAdmin Contact: ${currentWhoisData.adminContact || 'N/A'}\nTech Contact: ${currentWhoisData.techContact || 'N/A'}\nRaw Whois (partial for context):\n${currentWhoisData.raw ? currentWhoisData.raw.substring(0, 500) + '...' : 'N/A'}\n\n`;
+                } else {
+                    prompt += `WHOIS Data: Not available.\n\n`;
+                }
+
+                if (currentDnsData && currentDnsData.length > 0) {
+                    prompt += `DNS Records:\n`;
+                    currentDnsData.forEach(record => {
+                        prompt += `- Type: ${record.type}, Host: ${record.host}, Value: ${record.value}${record.priority ? ', Priority: ' + record.priority : ''}\n`;
+                    });
+                    prompt += `\n`;
+                } else {
+                    prompt += `DNS Records: Not available.\n\n`;
+                }
+
+                if (currentWebArchivesData && currentWebArchivesData.length > 0) {
+                    prompt += `Web Archives:\n`;
+                    currentWebArchivesData.forEach(archive => {
+                        prompt += `- Capture: ${archive.date}, URL: ${archive.url}\n`;
+                    });
+                    prompt += `\n`;
+                } else {
+                    prompt += `Web Archives: Not available.\n\n`;
+                }
+
+                await callGeminiAPI(prompt, nextStepsLoading, nextStepsContent);
+            });
+        });
+    </script>
+</body>
+</html>
